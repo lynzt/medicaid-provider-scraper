@@ -13,9 +13,9 @@ def upsert_provider(params):
 def update_provider(params, provider_id):
     sql_params = [params['provider_name']]
     sql_str = ''
-    if 'street_address' in params:
-        sql_str += ', street_address = %s'
-        sql_params.append(params['street_address'])
+    if 'address' in params:
+        sql_str += ', address = %s'
+        sql_params.append(params['address'])
     if 'phone' in params:
         sql_str += ', phone = %s'
         sql_params.append(params['phone'])

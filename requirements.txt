@@ -1,3 +1,5 @@
 requests
 beautifulsoup4
 psycopg2
+git+git://github.com/lynzt/python_people_names.git
+git+git://github.com/lynzt/python_utils.git
