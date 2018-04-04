@@ -2,19 +2,16 @@ import re
 import os
 import sys
 import pprint as pp
-
+from pathlib import Path
 from people_names import people_names
-# from provider_files_config import provider_files
 
 import database.types as types_model
 import database.subtypes as subtypes_model
 import database.providers as providers_model
 import database.doctors as doctors_model
 import database.type_providers as type_providers_model
-import database.type_doctors as type_doctors_model
+import database.doctor_providers as doctor_providers_model
 import database.subtype_types as subtype_types_model
-
-from pathlib import Path
 
 
 def get_provider_files(provider_files):
@@ -41,7 +38,10 @@ def parse_file(file_contents, provider_type, provider_subtype, stopwords):
     has_doc_name = includes_doctor_name(file_contents, stopwords)
     providers = []
     # def parse_provider_data(line, data, counter, has_doc_name):
-    for s in file_contents[:6]:
+    # for s in file_contents[:6]:
+    print ('has_doc_name: {}'.format(has_doc_name))
+    for s in file_contents[275:280]:
+    # for s in file_contents:
         fields = list(filter(lambda x: x != '', s))
         if len(fields) == 0:
             continue
@@ -65,21 +65,25 @@ def includes_doctor_name(file_contents, stopwords):
         provider_match = is_provider_name(stopwords, fields[0])
         if not provider_match:
             count_doc_name+=1
-    return count_doc_name > (nbr_providers_subset/2 + 1)
+    return count_doc_name > (nbr_providers_subset/2 - 2)
 
 def is_provider_name(stopwords, string):
     return  re.findall(r"(?=("+'|'.join(stopwords)+r"))", string)
 
 def parse_provider_data(provider_info, data, has_doc_name, stopwords):
+    print  (provider_info)
     if is_provider_name(stopwords, provider_info[0]):
+        print ('aa')
         data['provider_name'] = provider_info[0].strip()
         start_index = 1
     elif is_provider_name(stopwords, provider_info[1]):
+        print ('bb')
         doc_name = parse_doctor_name(provider_info[0].strip())
         data['doc_name'] = people_names.split_name(doc_name, 'fml')
         data['provider_name'] = provider_info[1].strip()
         start_index = 2
     elif check_regex(provider_info[1], data) == 'address':
+        print ('cc')
         if has_doc_name:
             doc_name = parse_doctor_name(provider_info[0].strip())
             data['doc_name'] = people_names.split_name(doc_name, 'fml')
@@ -88,12 +92,12 @@ def parse_provider_data(provider_info, data, has_doc_name, stopwords):
             data['provider_name'] = provider_info[1].strip()
         start_index = 1
     else:
+        print ('dd')
         doc_name = parse_doctor_name(provider_info[0].strip())
         data['doc_name'] = people_names.split_name(doc_name, 'fml')
 
         data['provider_name'] = provider_info[1].strip()
         start_index = 2
-
 
     for pi in provider_info[start_index:]:
         type = check_regex(pi, data)
@@ -111,7 +115,6 @@ def parse_doctor_name(line):
 def check_regex(line, data):
     if re.compile('(?i)PO BOX|(?i)p.o. box').match(line):
         return 'po_box'
-        # return data
     if re.compile(r'^(\d{2,}|\d+TH|\d+RD)(.+ ){2,}').match(line):
         return 'address'
     elif re.compile('^STE').match(line):
@@ -138,35 +141,37 @@ def insert_into_db(providers):
 
         # this should be in a transaction... meh
         type_id = types_model.upsert_type(provider)
-        subtype_id = subtypes_model.upsert_subtype(provider)
-        provider_id = providers_model.upsert_provider(provider)
-        providers_model.update_provider(provider, provider_id[0])
-        type_providers_model.upsert_type_provider(type_id[0], provider_id[0])
-        subtype_types_model.upsert_subtype_type(subtype_id[0], type_id[0])
+        subtype_id = subtypes_model.upsert_subtype(provider, type_id[0])
+        print (provider)
+        if 'doc_name' in provider and 'provider_name' not in provider:
+            provider['provider_name'] = '{} {} {}'.format(provider['doc_name']['first_name'], provider['doc_name']['middle_name'], provider['doc_name']['last_name'])
+            provider['provider_name'] = ' '.join(provider['provider_name'].split())
+            print (provider['provider_name'])
+
+        if 'provider_name' in provider:
+            provider_id = providers_model.upsert_provider(provider)
+            providers_model.update_provider(provider, provider_id[0])
+            type_providers_model.upsert_type_provider('provider', type_id[0], provider_id[0])
+
         if 'doc_name' in provider:
             doctor_id = doctors_model.upsert_doctor(provider['doc_name'])
-            type_doctors_model.upsert_type_doctor(type_id[0], doctor_id[0])
+            type_providers_model.upsert_type_provider('doctor', type_id[0], doctor_id[0])
 
-
+        if 'doc_name' in provider and 'provider_name' in provider:
+            doctor_providers_model.upsert_doctor_providers(doctor_id[0], provider_id[0])
 
 def main():
     files = get_provider_files('./provider_files')
     stopwords = read_stopfile()
-    all_providers = []
 
-    for file in files[10:15]:
+    temp = filter(lambda x: x.parts[2] == 'Chiropractic.txt', files)
+    for file in temp:
         dir, subdir, filename = file.parts
         print('\n**************subdir: {} | filename: {}'.format(subdir, filename))
         subtype, _ = filename.split(".")
-        providers = read_and_parse_file(file, subdir, subtype, stopwords)# print (providers)
-        # pp.pprint(providers)
+        providers = read_and_parse_file(file, subdir, subtype, stopwords)
         insert_into_db(providers)
 
-        # all_providers += providers
-    # return all_providers
-
-    # providers = parse_all_providers(provider_files)
-    # insert_into_db(providers)
 
 if __name__ == '__main__':
     main()

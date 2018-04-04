@@ -39,3 +39,38 @@ def update_provider(params, provider_id):
     sql_stmt = '''update providers set provider = %s '''
     sql_stmt += sql_str + ''' where id = %s returning *'''
     return db.run_query(sql_stmt, sql_params, 'one')
+
+
+def get_null_zip_codes(limit):
+    sql_params = [limit]
+    sql_stmt = '''select id, provider, address
+        from providers
+        where zip_code is null
+        limit %s'''
+    return db.run_query(sql_stmt, sql_params)
+
+
+def update_address_geodata(params, provider_id):
+    sql_params = [params['full_address'],
+                params['street_nbr']['long_name'],
+                params['street']['long_name'],
+                params['city']['long_name'],
+                params['county']['long_name'],
+                params['state']['long_name'],
+                params['postal_code']['long_name'],
+                params['lng'],
+                params['lat'],
+                provider_id
+    ]
+
+    sql_stmt = '''update providers set full_address = %s,
+                                        street_nbr = %s,
+                                        street = %s,
+                                        city = %s,
+                                        county = %s,
+                                        state = %s,
+                                        zip_code = %s,
+                                        geom = ST_SetSRID(ST_MakePoint(%s, %s), 4326)
+                    where id = %s
+                    returning *;'''
+    return db.run_query(sql_stmt, sql_params, 'one')

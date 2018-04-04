@@ -2,4 +2,4 @@
 *.pyc
 node_modules/
 .vscode/
-
+config/*
