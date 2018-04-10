@@ -3,4 +3,5 @@ beautifulsoup4
 psycopg2
 unidecode
 awesome-slugify
+pprint
 git+git://github.com/lynzt/python_people_names.git
